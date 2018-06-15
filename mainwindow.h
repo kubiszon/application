@@ -53,16 +53,28 @@
 #define MAINWINDOW_H
 
 #include <QtCore/QtGlobal>
-
 #include <QMainWindow>
-
 #include <QtSerialPort/QSerialPort>
-
-// MySQL
-#include <QSqlDatabase>
-#include <QSqlQuery>
+#include <QMessageBox>
+#include <QLabel>
+#include <QTime>
 #include <QDebug>
 #include <QString>
+#include <QtWidgets>
+
+#include <QSqlDatabase>
+#include <QSqlQuery>
+#include <QtSql>
+#include <QSqlTableModel>
+#include <QList>
+
+#include "settingsdialog.h"
+#include "browsedbdialog.h"
+#include "adduserdialog.h"
+#include "adddevicedialog.h"
+#include "ui_mainwindow.h"
+#include "console.h"
+#include "user.h"
 
 QT_BEGIN_NAMESPACE
 
@@ -74,8 +86,23 @@ class MainWindow;
 
 QT_END_NAMESPACE
 
+#define CSTR(x) ((x).toStdString().c_str())
+#define QNUM(x) (QString::number(x))
+
+enum itemToAdd {
+    USER,
+    DEVICE
+};
+
+void infoMessage(QMainWindow *obj, QString msg);
+void warningMessage(QMainWindow *obj, QString msg);
+void criticalMessage(QMainWindow *obj, QString msg);
+
 class Console;
 class SettingsDialog;
+class BrowseDbDialog;
+class AddUserDialog;
+class AddDeviceDialog;
 
 class MainWindow : public QMainWindow
 {
@@ -89,46 +116,43 @@ private slots:
     void openSerialPort();
     void closeSerialPort();
     void about();
-    void displayDatabase();
     void writeData(const QByteArray &data);
     void readData();
-
     void handleError(QSerialPort::SerialPortError error);
+    void openUserAddDialog(unsigned uid);
+    void openDeviceAddDialog(unsigned did);
 
 private:
     void initActionsConnections();
-
-private:
     void showStatusMessage(const QString &message);
-
-private:
     void initMySQLConnection(void);
-
-
+    bool simpleDbQuery(QSqlQuery query);
+    bool getUserInfo(unsigned uid);
+    bool getUserTransactionInfo(unsigned uid);
+    bool getDeviceInfo(unsigned did);
+    bool isDeviceAssignedToUser(unsigned uid, unsigned did);
+    bool assignDeviceToUser(unsigned uid, unsigned did);
+    bool deassignDeviceFromUser(unsigned uid, unsigned did);
+    void askForDataInsertion(QString msg, itemToAdd item, unsigned id);
+    void clearUserAndDevInfo();
+    void restartApp();
 
     Ui::MainWindow *ui;
     QLabel *status;
     Console *console;
     SettingsDialog *settings;
+    BrowseDbDialog *tables;
+    AddUserDialog *useradd;
+    AddDeviceDialog *deviceadd;
     QSerialPort *serial;
     QSqlDatabase db;
 
-    bool rfidConnected = false;
     bool userValid = false;
     unsigned currentUser = 0;
     unsigned currentDevice = 0;
 
-
-    bool queryMysqlDatabase(QString query);
-
-    bool isUserInDatabase(unsigned uid);
-
-    //QSqlDatabase db;
+    UserInfo user_info;
+    DeviceInfo dev_info;
 };
-
-bool isDeviceAssignedToUser(unsigned uid, unsigned did);
-bool assignDeviceToUser(unsigned uid, unsigned did);
-bool deassignDeviceFromUser(unsigned uid, unsigned did);
-
 
 #endif // MAINWINDOW_H

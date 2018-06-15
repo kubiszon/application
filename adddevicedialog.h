@@ -49,22 +49,50 @@
 **
 ****************************************************************************/
 
-#ifndef CONSOLE_H
-#define CONSOLE_H
+#ifndef ADDDEVICEDIALOG_H
+#define ADDDEVICEDIALOG_H
 
-#include <QPlainTextEdit>
+#include <QDialog>
+#include <QSqlTableModel>
+#include <QTableView>
+#include <QSqlRelationalDelegate>
+#include "mainwindow.h"
+#include "user.h"
 
-class Console : public QPlainTextEdit
+QT_USE_NAMESPACE
+
+QT_BEGIN_NAMESPACE
+
+namespace Ui {
+class AddDeviceDialog;
+}
+
+QT_END_NAMESPACE
+
+class AddDeviceDialog : public QDialog
 {
     Q_OBJECT
 
-signals:
-    void getData(const QByteArray &data);
+public:
+
+    explicit AddDeviceDialog(QWidget *parent = nullptr);
+    AddDeviceDialog(unsigned did);
+    ~AddDeviceDialog();
+
+private:
+
+    QSqlDatabase db;
 
 public:
-    explicit Console(QWidget *parent = nullptr);
+    Ui::AddDeviceDialog *ui;
+    DeviceInfo ui_dev_info;
 
-    void log(const char *fmt, ...);
+private slots:
+
+    void on_lineEditName_textChanged(const QString &arg1);
+    void on_lineEditModel_textChanged(const QString &arg1);
+    void on_lineEditYear_textChanged(const QString &arg1);
+    void on_submitButton_clicked();
 };
 
-#endif // CONSOLE_H
+#endif

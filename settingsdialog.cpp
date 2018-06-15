@@ -65,9 +65,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) :
     ui(new Ui::SettingsDialog)
 {
     ui->setupUi(this);
-
     intValidator = new QIntValidator(0, 4000000, this);
-
     ui->baudRateBox->setInsertPolicy(QComboBox::NoInsert);
 
     connect(ui->applyButton, &QPushButton::clicked,
@@ -81,7 +79,6 @@ SettingsDialog::SettingsDialog(QWidget *parent) :
 
     fillPortsParameters();
     fillPortsInfo();
-
     updateSettings();
 }
 

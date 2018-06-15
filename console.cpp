@@ -50,64 +50,32 @@
 ****************************************************************************/
 
 #include "console.h"
-
 #include <QScrollBar>
-
 #include <QtCore/QDebug>
 
 Console::Console(QWidget *parent)
     : QPlainTextEdit(parent)
-    , localEchoEnabled(false)
 {
     document()->setMaximumBlockCount(100);
     QPalette p = palette();
-    p.setColor(QPalette::Base, Qt::black);
-    p.setColor(QPalette::Text, Qt::green);
+    p.setColor(QPalette::Base, Qt::white);
+    p.setColor(QPalette::Text, Qt::blue);
+    QFont font;
+    font.setFamily("Courier New");
+    font.setPointSize(12);
+    document()->setDefaultFont(font);
     setPalette(p);
-
 }
 
-void Console::putData(const QByteArray &data)
+void Console::log(const char* fmt, ...)
 {
-    insertPlainText(QString(data));
+    char buffer[4096];
+    va_list args;
+    va_start(args,fmt);
+    vsnprintf(buffer, 4096, fmt, args);
+    va_end(args);
 
+    insertPlainText(QString(buffer) + "\n");
     QScrollBar *bar = verticalScrollBar();
     bar->setValue(bar->maximum());
-}
-
-void Console::setLocalEchoEnabled(bool set)
-{
-    localEchoEnabled = set;
-}
-
-void Console::keyPressEvent(QKeyEvent *e)
-{
-    switch (e->key()) {
-    case Qt::Key_Backspace:
-    case Qt::Key_Left:
-    case Qt::Key_Right:
-    case Qt::Key_Up:
-    case Qt::Key_Down:
-        break;
-    default:
-        if (localEchoEnabled)
-            QPlainTextEdit::keyPressEvent(e);
-        emit getData(e->text().toLocal8Bit());
-    }
-}
-
-void Console::mousePressEvent(QMouseEvent *e)
-{
-    Q_UNUSED(e)
-    setFocus();
-}
-
-void Console::mouseDoubleClickEvent(QMouseEvent *e)
-{
-    Q_UNUSED(e)
-}
-
-void Console::contextMenuEvent(QContextMenuEvent *e)
-{
-    Q_UNUSED(e)
 }

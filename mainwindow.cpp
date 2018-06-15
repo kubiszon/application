@@ -50,128 +50,65 @@
 ****************************************************************************/
 
 #include "mainwindow.h"
-#include "ui_mainwindow.h"
-#include "console.h"
-#include "settingsdialog.h"
 
-#include <QMessageBox>
-#include <QLabel>
-#include <QtSerialPort/QSerialPort>
-#include <QTime>
+QString msg            = "_______________________________";
+QString app_ready_msg  = "APPLICATION INITIALIZED________";
+QString app_reset_msg  = "APPLICATION RESTARTED__________";
+QString no_user_msg    = "USER NOT FOUND IN DATABASE_____";
+QString user_added_msg = "USER ADDED TO DATABASE_________";
+QString dev_borrow_msg = "DEVICE HAS BEEN BORROWED_______";
+QString dev_return_msg = "DEVICE HAS BEEN RETURNED_______";
+QString no_dev_msg     = "DEVICE DOES NOT EXIST__________";
+QString userIdPrefix   = "UID:";
 
-// MySQL
-#include <QSqlDatabase>
-#include <QSqlQuery>
-#include <QDebug>
-#include <QString>
-
-#include <QtSql>
-#include <QtWidgets>
-#include "connection.h"
-
-void initializeModel(QSqlTableModel *model)
-{
-    createConnection();
-    //! [0]
-        model->setTable("user");
-    //! [0]
-
-        //model->setEditStrategy(QSqlTableModel::OnManualSubmit);
-    //! [1]
-      //  model->setRelation(2, QSqlRelation("city", "id", "name"));
-    //! [1] //! [2]
-      //  model->setRelation(3, QSqlRelation("country", "id", "name"));
-    //! [2]
-
-    //! [3]
-        model->setHeaderData(0, Qt::Horizontal, QObject::tr("user_id"));
-        model->setHeaderData(1, Qt::Horizontal, QObject::tr("name"));
-        model->setHeaderData(2, Qt::Horizontal, QObject::tr("surname"));
-       // model->setHeaderData(3, Qt::Horizontal, QObject::tr("Country"));
-    //! [3]
-
-        model->select();
+void infoMessage(QMainWindow *obj, QString msg){
+    QMessageBox::information(obj, obj->tr("Informacja"), obj->tr(CSTR(msg)));
 }
 
-QTableView *createView(const QString &title, QSqlTableModel *model)
-{
-//! [4]
-    QTableView *view = new QTableView;
-    view->setModel(model);
-    view->setItemDelegate(new QSqlRelationalDelegate(view));
-//! [4]
-    view->setWindowTitle(title);
-    return view;
+void warningMessage(QMainWindow *obj, QString msg) {
+    QMessageBox::warning(obj, obj->tr("Ostrzeżenie"), obj->tr(CSTR(msg)));
 }
 
-int printSqlDatabase(void)
-{
-  // QWidget app();
-printf("\n\ninside printSqlDatabase\n\n");
-
-   // createRelationalTables();
-
-    QSqlTableModel model;
-
-    initializeModel(&model);
-
-    QTableView *view = createView(QObject::tr("Relational Table Model"), &model);
-    view->show();
-
-
-
-    //return app.show();
-    return 666;
+void criticalMessage(QMainWindow *obj, QString msg){
+    QMessageBox::critical(obj, obj->tr("Błąd krytyczny"), obj->tr(CSTR(msg)));
 }
 
-
-
-//! [0]
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
 {
-//! [0]
     ui->setupUi(this);
     console = new Console;
     console->setEnabled(false);
     setCentralWidget(console);
-//! [1]
     serial = new QSerialPort(this);
-//! [1]
     settings = new SettingsDialog;
+    tables = new BrowseDbDialog;
 
     ui->actionConnect->setEnabled(true);
     ui->actionDisconnect->setEnabled(false);
     ui->actionQuit->setEnabled(true);
     ui->actionConfigure->setEnabled(true);
-
     status = new QLabel;
     ui->statusBar->addWidget(status);
 
     initActionsConnections();
-
     connect(serial, static_cast<void (QSerialPort::*)(QSerialPort::SerialPortError)>(&QSerialPort::error),
             this, &MainWindow::handleError);
-
-//! [2]
     connect(serial, &QSerialPort::readyRead, this, &MainWindow::readData);
-//! [2]
     connect(console, &Console::getData, this, &MainWindow::writeData);
 
-
-   // initMySQLConnection();
-//! [3]
+    initMySQLConnection();
+    ui->actionConnect->trigger();
 }
-//! [3]
 
 MainWindow::~MainWindow()
 {
+    delete tables;
     delete settings;
     delete ui;
 }
 
-//! [4]
 void MainWindow::openSerialPort()
 {
     SettingsDialog::Settings p = settings->settings();
@@ -181,10 +118,8 @@ void MainWindow::openSerialPort()
     serial->setParity(p.parity);
     serial->setStopBits(p.stopBits);
     serial->setFlowControl(p.flowControl);
-   // serial->setReadBufferSize(20);
     if (serial->open(QIODevice::ReadWrite)) {
         console->setEnabled(true);
-        console->setLocalEchoEnabled(p.localEchoEnabled);
         ui->actionConnect->setEnabled(false);
         ui->actionDisconnect->setEnabled(true);
         ui->actionConfigure->setEnabled(false);
@@ -196,10 +131,27 @@ void MainWindow::openSerialPort()
 
         showStatusMessage(tr("Open error"));
     }
-}
-//! [4]
+    QThread::usleep(200000);
+    serial->write(QByteArray(CSTR(app_reset_msg)));
+    QThread::usleep(200000);
+    serial->write(QByteArray(CSTR(app_ready_msg)));
 
-//! [5]
+    console->log("Aplikacja gotowa");
+    console->log("\nOczekiwanie na użytkownika...");
+}
+
+void MainWindow::restartApp()
+{
+    QThread::usleep(200000);
+    serial->write(QByteArray(CSTR(app_reset_msg)));
+    currentUser = 0;
+    currentDevice = 0;
+    userValid = false;
+    QThread::usleep(200000);
+    serial->write(QByteArray(CSTR(app_ready_msg)));
+    console->log("\nOczekiwanie na użytkownika...");
+}
+
 void MainWindow::closeSerialPort()
 {
     if (serial->isOpen())
@@ -210,92 +162,94 @@ void MainWindow::closeSerialPort()
     ui->actionConfigure->setEnabled(true);
     showStatusMessage(tr("Disconnected"));
 }
-//! [5]
 
 void MainWindow::about()
 {
-    QMessageBox::about(this, tr("About Simple Terminal"),
-                       tr("The <b>Simple Terminal</b> example demonstrates how to "
-                          "use the Qt Serial Port module in modern GUI applications "
-                          "using Qt, with a menu bar, toolbars, and a status bar."));
+    QMessageBox::about(this, tr("O programie"),
+                       tr("Program <b>Rejestrator wypożyczeń narzędzi</b> ma na celu "
+                          "ułatwienie ewidencji urządzeń i użytkowników "
+                          "poprzez rejestrowanie transakcji w bazie danych"));
 }
 
-void MainWindow::displayDatabase()
-{
-    printSqlDatabase();
-}
-
-//! [6]
 void MainWindow::writeData(const QByteArray &data)
 {
     serial->write(data);
 }
-//! [6]
 
-//! [7]
 void MainWindow::readData()
 {
-    // Read data
-        static QByteArray byteArray;
-        byteArray += serial->readAll();
+    static QByteArray byteArray;
+    byteArray += serial->readAll();
 
+    if(!QString(byteArray).contains("\n"))
+       return;
 
-        //we want to read all message not only chunks
-        if(!QString(byteArray).contains("\n")){
-           return;
-        }
+    QString data = QString( byteArray ).remove("\r").remove("\n");
+    byteArray.clear();
 
-        console->putData(byteArray);
+    qDebug("data: %s", CSTR(data));
 
-        //sanitize data
-        QString data = QString( byteArray ).remove("\r").remove("\n");
-        byteArray.clear();
-
-
-        printf("data: %s\n", data.toStdString().c_str());
-
-        if (!rfidConnected && data == QString("LOG: RFID is ready")) {
-            printf("Entering connected state...\n");
-            serial->write(QByteArray("APP READY"));
-            printf("\n");
-            rfidConnected = true;
+    if (!userValid){
+        console->log("\n___________________________________________________________");
+        clearUserAndDevInfo();
+        QString userStr = data.mid(data.indexOf(userIdPrefix) + userIdPrefix.length());
+        currentUser = userStr.toUInt();
+        if(getUserInfo(currentUser)) {
+            userValid = true;
+            QString user_name_msg = msg;
+            QString msg_text = user_info.name + "." + user_info.surname;
+            console->log("Użytkownik: %s %s, ID %d", CSTR(user_info.name), CSTR(user_info.surname), user_info.id);
+            for (int i = 0; i < (msg_text.length()) && i < 31 ; i++)
+                user_name_msg[i] = msg_text[i];
+            serial->write(QByteArray(CSTR(user_name_msg)));
+            getUserTransactionInfo(currentUser);
+        } else {
+            unsigned temp_id = currentUser;
+            serial->write(QByteArray(CSTR(no_user_msg)));
+            //restartApp();
+            console->log("Brak użytkownika o ID=%d w bazie", temp_id);
+            askForDataInsertion("Brak użytkownika w bazie. Dodać użytkownika?", USER, temp_id);
+            restartApp();
             return;
         }
-        if (rfidConnected && !userValid){
-            currentUser = data.toUInt();
-            if(isUserInDatabase(currentUser)) {
-                userValid = true;
-                printf("User found in DB\n");
-            } else {
-                printf("No such user in DB. Add user?\n");
-                // process user adding here
-            }
+        serial->readAll();
+        return;
+    }
+    if (userValid){
+        QString deviceStr = data.mid(data.indexOf(":") + 1);
+        currentDevice = deviceStr.toUInt();
+        qDebug("ID narzędzia: %d", currentDevice);
+        if (currentDevice == currentUser) {
+            warningMessage(this, "ID narzędzia jest równe ID użytkownika");
+            restartApp();
             return;
         }
-        if (userValid){
-            currentDevice = data.toUInt();
-            if (currentDevice == currentUser) {
-                printf("Error, device id %d equals user id\n", currentDevice);
-                userValid = false;
-                return;
-            }
+        if(getDeviceInfo(currentDevice)) {
+            console->log("ID narzędzia: %d", dev_info.id);
+            console->log("%s, %s, %d, %s", CSTR(dev_info.name), CSTR(dev_info.model),
+                    dev_info.year, dev_info.user_id ? "wypożyczone" : "dostępne");
             if(isDeviceAssignedToUser(currentUser, currentDevice)) {
                 deassignDeviceFromUser(currentUser, currentDevice);
-                printf("User %d returned device %d\n", currentUser, currentDevice);
+                console->log("Użytkownik %d zwrócił narzędzie %d", currentUser, currentDevice);
+                serial->write(QByteArray(CSTR(dev_return_msg)));
             } else {
                 assignDeviceToUser(currentUser, currentDevice);
-                printf("User %d borrowed device %d\n", currentUser, currentDevice);
+                console->log("Użytkownik %d wypożyczył narzędzie %d", currentUser, currentDevice);
+                serial->write(QByteArray(CSTR(dev_borrow_msg)));
             }
-            userValid = false;
-            return;
         }
-
-
-
+        else {
+            console->log("", currentDevice);
+            serial->write(QByteArray(CSTR(no_dev_msg)));
+            askForDataInsertion("Brak urządzenia w bazie. Dodać narzędzie?",
+                                DEVICE, currentDevice);
+        }
+        restartApp();
+        tables->FillTables();
+        tables->repaint();
+    }
 }
-//! [7]
 
-//! [8]
 void MainWindow::handleError(QSerialPort::SerialPortError error)
 {
     if (error == QSerialPort::ResourceError) {
@@ -303,7 +257,6 @@ void MainWindow::handleError(QSerialPort::SerialPortError error)
         closeSerialPort();
     }
 }
-//! [8]
 
 void MainWindow::initActionsConnections()
 {
@@ -312,7 +265,8 @@ void MainWindow::initActionsConnections()
     connect(ui->actionQuit, &QAction::triggered, this, &MainWindow::close);
     connect(ui->actionConfigure, &QAction::triggered, settings, &MainWindow::show);
     connect(ui->actionClear, &QAction::triggered, console, &Console::clear);
-    connect(ui->actionSql, &QAction::triggered, this, &MainWindow::displayDatabase);
+    connect(ui->actionRestartApp, &QAction::triggered, this, &MainWindow::restartApp);
+    connect(ui->actionSql, &QAction::triggered, tables, &MainWindow::show);
     connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::about);
     connect(ui->actionAboutQt, &QAction::triggered, qApp, &QApplication::aboutQt);
 }
@@ -320,64 +274,231 @@ void MainWindow::initActionsConnections()
 void MainWindow::showStatusMessage(const QString &message)
 {
     status->setText(message);
-
 }
 
 void MainWindow::initMySQLConnection(void)
 {
-    db = QSqlDatabase::addDatabase("QMYSQL");
+    db = QSqlDatabase::addDatabase("QMYSQL", "BoardDatabaseConnection");
     db.setHostName("localhost");
-    db.setDatabaseName("rfid");
+    db.setPort(3306);
+    db.setDatabaseName("rfid_db");
     db.setUserName("root");
     db.setPassword("");
-
 }
 
-bool MainWindow::queryMysqlDatabase(QString query){
-    printf("Query: %s\n", query.toStdString().c_str());
+bool MainWindow::getUserInfo(unsigned uid){
     if(!db.open()){
-        printf("Nieudane polaczenie z baza danych\n");
+        criticalMessage(this, "Nie udało się połączyć z bazą danych");
         return false;
+    }
+    else {
+        QSqlQuery sqlQuery(db);
+        QString query = "SELECT * FROM users WHERE user_id=" + QString::number(uid);
+        qDebug("DB query: %s", CSTR(query));
+        if(!sqlQuery.exec(query) || !sqlQuery.first()){
+            db.close();
+            return false;
         }
+        else {
+            user_info.id      = sqlQuery.value("user_id").toUInt();
+            user_info.name    = sqlQuery.value("name").toString();
+            user_info.surname = sqlQuery.value("surname").toString();
+            qDebug("user: %d, name: %s, surname: %s", user_info.id, CSTR(user_info.name), CSTR(user_info.surname));
+        }
+    }
+    db.close();
+    return true;
+}
+
+bool MainWindow::getUserTransactionInfo(unsigned uid){
+    if(!db.open()){
+        criticalMessage(this, "Nie udało się połączyć z bazą danych");
+        return false;
+    }
+    else {
+        QSqlQuery sqlQuery(db);
+        QString query = "SELECT * FROM transactions WHERE user_id=" + QString::number(uid);
+        qDebug("DB query: %s",  CSTR(query));
+        if(!sqlQuery.exec(query) || !sqlQuery.first()){
+            console->log("Brak transakcji dla tego użytkownika");
+            db.close();
+            return true;
+        }
+
+        do {
+            TransactionInfo tran_info;
+            tran_info.id          = sqlQuery.value("transaction_id").toUInt();
+            tran_info.user_id     = sqlQuery.value("user_id").toUInt();
+            tran_info.device_id   = sqlQuery.value("device_id").toUInt();
+            tran_info.rental_date = sqlQuery.value("rental_date").toDate();
+            tran_info.return_date = sqlQuery.value("return_date").toDate();
+            tran_info.archived    = sqlQuery.value("archived").toBool();
+            if (!tran_info.archived) {
+                user_info.transactions.append(tran_info);
+                qDebug("transaction: %d, user: %d, device: %d",
+                       tran_info.id, tran_info.user_id, tran_info.device_id);
+            }
+        } while (sqlQuery.next());
+        console->log("Użytkownik %d posiada %d wypożyczonych narzędzi", uid, user_info.transactions.length());
+    }
+
+    db.close();
+    return true;
+}
+
+bool MainWindow::getDeviceInfo(unsigned did){
+    if(!db.open()){
+        criticalMessage(this, "Nie udało się połączyć z bazą danych");
+        return false;
+    }
     else
     {
-        printf("Udane polaczenie z baza danych\n");
-
-        QSqlQuery qry;
-        if(!qry.exec(query))
-            printf("Brak rekordow w tabeli Stats");
-
-        while(qry.next())
-        {
-            int id = qry.value("user_id").toInt();
-            QString name = qry.value(1).toString();
-            QString surname = qry.value(2).toString();
-
-            printf("user: %d, name: %s, surname: %s\n", id, name.toStdString().c_str(), surname.toStdString().c_str());
+        QSqlQuery sqlQuery(db);
+        QString query = "SELECT * FROM devices WHERE device_id=" + QString::number(did);
+        qDebug("DB query: %s", CSTR(query));
+        if(!sqlQuery.exec(query)) {
+            criticalMessage(this, "Zapytanie nie powiodło się");
+            db.close();
+            return false;
         }
-
-        db.close();
+        if (!sqlQuery.first()){
+            console->log("Brak urządzenia %d w bazie", did);
+            db.close();
+            return false;
+        }
+        else {
+            dev_info.id      = sqlQuery.value("device_id").toUInt();
+            dev_info.user_id = sqlQuery.value("user_id").toUInt();
+            dev_info.name    = sqlQuery.value("device_name").toString();
+            dev_info.model   = sqlQuery.value("device_model").toString();
+            dev_info.year    = sqlQuery.value("device_year").toUInt();
+            qDebug("id: %d, user_id: %d, name: %s, model: %s, year: %d",
+                    dev_info.id, dev_info.user_id, CSTR(dev_info.name), CSTR(dev_info.model), dev_info.year);
+        }
     }
+
+    db.close();
     return true;
 }
 
-bool MainWindow::isUserInDatabase(unsigned uid){
-
-    return queryMysqlDatabase("SELECT * FROM user WHERE user_id=" + QString::number(uid));
-
+bool MainWindow::isDeviceAssignedToUser(unsigned uid, unsigned did) {
+    for (auto t : user_info.transactions){
+        qDebug("User %d device: %d", t.user_id, t.device_id);
+        if (did == t.device_id && uid == t.user_id && !t.archived){
+            console->log("Znaleziono narzędzie %d przypisane do użytkownika %d", did, uid);
+            return true;
+        }
+    }
+    return false;
 }
 
-bool isDeviceAssignedToUser(unsigned uid, unsigned did) {
+bool MainWindow::assignDeviceToUser(unsigned uid, unsigned did){
+    if(!db.open()){
+        criticalMessage(this, "Nie udało się połączyć z bazą danych");
+        return false;
+    }
+    QSqlQuery q(db), q2(db);
+    q.prepare("INSERT INTO transactions VALUES (NULL, ?, ?, ?, ?, ?)");
+    q.addBindValue(QNUM(uid));
+    q.addBindValue(QNUM(did));
+    q.addBindValue(QDate::currentDate());
+    q.addBindValue(0);
+    q.addBindValue(false);
+    if (!simpleDbQuery(q)) {
+        db.close();
+        return false;
+    }
+
+    q2.prepare("UPDATE devices SET user_id=? WHERE device_id=?");
+    q2.addBindValue(QNUM(uid));
+    q2.addBindValue(QNUM(did));
+    if (!simpleDbQuery(q2)) {
+        db.close();
+        return false;
+    }
+
+    db.close();
     return true;
-
 }
 
-bool assignDeviceToUser(unsigned uid, unsigned did){
-    return false;
+bool MainWindow::deassignDeviceFromUser(unsigned uid, unsigned did){
+    if(!db.open()){
+        criticalMessage(this, "Nie udało się połączyć z bazą danych");
+        return false;
+    }
+    QSqlQuery q(db), q2(db);
+    q.prepare("UPDATE transactions SET return_date=?, archived=True WHERE device_id=? AND user_id=?");
+    q.addBindValue(QDate::currentDate());
+    q.addBindValue(QNUM(did));
+    q.addBindValue(QNUM(uid));
+    if (!simpleDbQuery(q)) {
+        db.close();
+        return false;
+    }
+
+    q2.prepare("UPDATE devices SET user_id=0 WHERE device_id=? AND user_id=?");
+    q2.addBindValue(QNUM(did));
+    q2.addBindValue(QNUM(uid));
+    if (!simpleDbQuery(q2)) {
+        db.close();
+        return false;
+    }
+
+    db.close();
+    return true;
 }
 
-bool deassignDeviceFromUser(unsigned uid, unsigned did){
-    return false;
-
+bool MainWindow::simpleDbQuery(QSqlQuery sqlQuery){
+    if(!sqlQuery.exec()){
+        warningMessage(this, "Zapytanie nie powiodło się");
+        qDebug("Query failure: %s", CSTR(sqlQuery.executedQuery()));
+        return false;
+    }
+    QSqlRecord rec = sqlQuery.record();
+    qDebug("DB query: %s", CSTR(sqlQuery.executedQuery()));
+    for (int i=0; i<rec.count(); i++)
+        qDebug("%s ", rec.value(i).toString());
+    return true;
 }
 
+void MainWindow::openUserAddDialog(unsigned uid){
+    useradd = new AddUserDialog(uid);
+    useradd->ui_user_info.id = uid;
+    useradd->show();
+}
+
+void MainWindow::openDeviceAddDialog(unsigned did){
+    deviceadd = new AddDeviceDialog(did);
+    deviceadd->ui_dev_info.id = did;
+    deviceadd->show();
+}
+
+void MainWindow::askForDataInsertion(QString msg, itemToAdd item, unsigned id) {
+    switch( QMessageBox::question(this, tr("Wymagana akcja"), tr(CSTR(msg)),
+                QMessageBox::Yes | QMessageBox::No))
+    {
+      case QMessageBox::Yes:
+        if (item == USER)
+            openUserAddDialog(id);
+        else if (item == DEVICE)
+            openDeviceAddDialog(id);
+        break;
+      case QMessageBox::No:
+        break;
+      default:
+        break;
+    }
+}
+
+void MainWindow::clearUserAndDevInfo() {
+    user_info.transactions.clear();
+    user_info.id = 0;
+    user_info.name = "";
+    user_info.surname = "";
+    user_info.borrowed_devs = 0;
+    dev_info.id = 0;
+    dev_info.name = "";
+    dev_info.model = "";
+    dev_info.year = 0;
+    dev_info.user_id = 0;
+}

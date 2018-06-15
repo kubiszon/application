@@ -6,12 +6,18 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
-    <height>300</height>
+    <width>700</width>
+    <height>423</height>
    </rect>
   </property>
+  <property name="minimumSize">
+   <size>
+    <width>700</width>
+    <height>100</height>
+   </size>
+  </property>
   <property name="windowTitle">
-   <string>Simple Terminal</string>
+   <string>Rejestrator wypożyczanych narzędzi</string>
   </property>
   <widget class="QWidget" name="centralWidget">
    <layout class="QVBoxLayout" name="verticalLayout"/>
@@ -21,8 +27,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>400</width>
-     <height>17</height>
+     <width>700</width>
+     <height>26</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuCalls">
@@ -62,7 +68,8 @@
    <addaction name="actionConnect"/>
    <addaction name="actionDisconnect"/>
    <addaction name="actionConfigure"/>
-   <addaction name="actionClear"/>  
+   <addaction name="actionClear"/>
+   <addaction name="actionRestartApp"/>
    <addaction name="actionSql"/>
   </widget>
   <widget class="QStatusBar" name="statusBar"/>
@@ -144,8 +151,8 @@
   </action>
   <action name="actionSql">
    <property name="icon">
-    <iconset resource="terminal.qrc">
-     <normaloff>:/images/settings.png</normaloff>:/images/settings.png</iconset>
+    <iconset>
+     <normaloff>images/participants.png</normaloff>images/participants.png</iconset>
    </property>
    <property name="text">
     <string>Database</string>
@@ -161,6 +168,18 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+Q</string>
+   </property>
+  </action>
+  <action name="actionRestartApp">
+   <property name="icon">
+    <iconset resource="terminal.qrc">
+     <normaloff>:/images/application-exit.png</normaloff>:/images/application-exit.png</iconset>
+   </property>
+   <property name="text">
+    <string>Restart App</string>
+   </property>
+   <property name="toolTip">
+    <string>Restart App</string>
    </property>
   </action>
  </widget>

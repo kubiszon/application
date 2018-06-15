@@ -49,22 +49,49 @@
 **
 ****************************************************************************/
 
-#ifndef CONSOLE_H
-#define CONSOLE_H
+#ifndef ADDUSERDIALOG_H
+#define ADDUSERDIALOG_H
 
-#include <QPlainTextEdit>
+#include <QDialog>
+#include <QSqlTableModel>
+#include <QTableView>
+#include <QSqlRelationalDelegate>
+#include "mainwindow.h"
+#include "user.h"
 
-class Console : public QPlainTextEdit
+QT_USE_NAMESPACE
+
+QT_BEGIN_NAMESPACE
+
+namespace Ui {
+class AddUserDialog;
+}
+
+QT_END_NAMESPACE
+
+class AddUserDialog : public QDialog
 {
     Q_OBJECT
 
-signals:
-    void getData(const QByteArray &data);
+public:
+
+    explicit AddUserDialog(QWidget *parent = nullptr);
+    AddUserDialog(unsigned uid);
+    ~AddUserDialog();
+
+private:
+
+    QSqlDatabase db;
 
 public:
-    explicit Console(QWidget *parent = nullptr);
+    Ui::AddUserDialog *ui;
+    UserInfo ui_user_info;
 
-    void log(const char *fmt, ...);
+private slots:
+
+    void on_lineEditName_textChanged(const QString &arg1);
+    void on_lineEditSurname_textChanged(const QString &arg1);
+    void on_submitButton_clicked();
 };
 
-#endif // CONSOLE_H
+#endif

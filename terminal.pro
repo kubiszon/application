@@ -1,5 +1,6 @@
 QT += widgets serialport sql
 
+QTPLUGIN += QSQLMYSQL
 
 TARGET = terminal
 TEMPLATE = app
@@ -7,19 +8,28 @@ TEMPLATE = app
 SOURCES += \
     main.cpp \
     mainwindow.cpp \
+    console.cpp \
     settingsdialog.cpp \
-    console.cpp
+    browsedbdialog.cpp \
+    adduserdialog.cpp \
+    adddevicedialog.cpp
 
 HEADERS += \
     mainwindow.h \
     settingsdialog.h \
     console.h \
-    connection.h
+    browsedbdialog.h \
+    adduserdialog.h \
+    user.h \
+    adddevicedialog.h
 
 FORMS += \
     mainwindow.ui \
+    dialog.ui \
     settingsdialog.ui \
-    dialog.ui
+    browsedbdialog.ui \
+    adduserdialog.ui \
+    adddevicedialog.ui
 
 RESOURCES += \
     terminal.qrc

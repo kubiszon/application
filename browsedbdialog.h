@@ -49,22 +49,44 @@
 **
 ****************************************************************************/
 
-#ifndef CONSOLE_H
-#define CONSOLE_H
+#ifndef BROWSEDBDIALOG_H
+#define BROWSEDBDIALOG_H
 
-#include <QPlainTextEdit>
+#include <QDialog>
+#include "ui_browsedbdialog.h"
+#include <QSqlTableModel>
+#include <QTableView>
+#include <QSqlRelationalDelegate>
 
-class Console : public QPlainTextEdit
+QT_USE_NAMESPACE
+
+QT_BEGIN_NAMESPACE
+
+namespace Ui {
+class BrowseDbDialog;
+}
+
+QT_END_NAMESPACE
+
+class BrowseDbDialog : public QDialog
 {
     Q_OBJECT
 
-signals:
-    void getData(const QByteArray &data);
-
 public:
-    explicit Console(QWidget *parent = nullptr);
 
-    void log(const char *fmt, ...);
+    explicit BrowseDbDialog(QWidget *parent = nullptr);
+    ~BrowseDbDialog();
+
+    void FillTables();
+
+private:
+
+    Ui::BrowseDbDialog *ui;
+    QSqlDatabase db;
+
+private slots:
+
+    void on_refreshButton_clicked();
 };
 
-#endif // CONSOLE_H
+#endif
